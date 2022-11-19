@@ -194,18 +194,9 @@ int main(int argc, char** argv) {
             ALOGE("If this triggers randomly, you might be hitting some memory allocation "
                   "problems or startup script race.");
             ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
-            sleep(20);
-            return 2;
+            android::base::SetProperty("bpf.progs_loaded", "1");
+            return 0;
         }
-    }
-
-    int key = 1;
-    int value = 123;
-    android::base::unique_fd map(
-            android::bpf::createMap(BPF_MAP_TYPE_ARRAY, sizeof(key), sizeof(value), 2, 0));
-    if (android::bpf::writeToMapEntry(map, &key, &value, BPF_ANY)) {
-        ALOGE("Critical kernel bug - failure to write into index 1 of 2 element bpf map array.");
-        return 1;
     }
 
     if (android::base::SetProperty("bpf.progs_loaded", "1") == false) {
