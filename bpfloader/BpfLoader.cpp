@@ -194,8 +194,28 @@ int main(int argc, char** argv) {
             ALOGE("If this triggers randomly, you might be hitting some memory allocation "
                   "problems or startup script race.");
             ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
-            android::base::SetProperty("bpf.progs_loaded", "1");
-            return 0;
+            // Pre-4.9 kernels lack Android eBPF support, so keep booting there.
+            // Load failures stay fatal on supported kernels.
+            if (android::bpf::isAtLeastKernelVersion(4, 9, 0)) {
+                sleep(20);
+                return 2;
+            }
+            ALOGW("Continuing without eBPF on a legacy kernel");
+            break;
+        }
+    }
+
+    // Android uses eBPF on 4.9+ kernels. Legacy devices such as bullhead
+    // run 3.10 without the bpf syscall; testing a map there forces a reboot.
+    // Keep the map-integrity check on kernels that support Android eBPF.
+    if (android::bpf::isAtLeastKernelVersion(4, 9, 0)) {
+        int key = 1;
+        int value = 123;
+        android::base::unique_fd map(
+                android::bpf::createMap(BPF_MAP_TYPE_ARRAY, sizeof(key), sizeof(value), 2, 0));
+        if (android::bpf::writeToMapEntry(map, &key, &value, BPF_ANY)) {
+            ALOGE("Critical kernel bug - failure to write into index 1 of 2 element bpf map array.");
+            return 1;
         }
     }
 
